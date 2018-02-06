@@ -1,0 +1,4 @@
+child.i.b: b_from_yaml
+child:
+  i:
+    c: c_from_yaml
