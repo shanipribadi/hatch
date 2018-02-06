@@ -14,8 +14,8 @@ type ignored struct {
 }
 type grandchild struct {
 	A string
-	B string `required:"true"`
-	C string `required:"true"`
+	B string `hatch:"true"`
+	C string `hatch:"true"`
 }
 type child struct {
 	A int
@@ -29,13 +29,14 @@ type child struct {
 	I grandchild
 }
 type parent struct {
-	Child       child
-	Default     int    `default:"1234"`
-	Required    string `required:"true"`
-	CamelCase   string `mapstructure:"camel_case"`
-	Ignored     *ignored
-	Prefilled   string
-	Overwritten string
+	Child        child
+	Default      int      `hatch:",1234"`
+	DefaultSlice []string `hatch:",string1,string2,string3"`
+	Required     string   `hatch:"true"`
+	CamelCase    string   `mapstructure:"camel_case"`
+	Ignored      *ignored
+	Prefilled    string
+	Overwritten  string
 }
 
 func (c *parent) GetType() reflect.Type {
@@ -58,9 +59,10 @@ func TestHatch(t *testing.T) {
 
 	dur, _ := time.ParseDuration("1h2m3s4ms5us6ns")
 	expected := &parent{
-		Default:   1234,
-		Required:  "required",
-		CamelCase: "camel_case",
+		Default:      1234,
+		DefaultSlice: []string{"string1", "string2", "string3"},
+		Required:     "required",
+		CamelCase:    "camel_case",
 		Child: child{
 			A: 1,
 			B: 1.23,

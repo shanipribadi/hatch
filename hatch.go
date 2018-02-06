@@ -53,38 +53,40 @@ func (h *hatch) AddPaths(s []string) *hatch {
 
 func (h *hatch) Unmarshal(i Hatchling) {
 	var pathProvided bool
+	v := viper.New()
 	if h.configName != "" {
-		viper.SetConfigName(h.configName) // name of config file (without extension)
+		v.SetConfigName(h.configName) // name of config file (without extension)
 	}
 	if h.configType != "" {
-		viper.SetConfigType(h.configType)
+		v.SetConfigType(h.configType)
 	}
 	for _, p := range h.configPaths {
-		viper.AddConfigPath(p)
+		v.AddConfigPath(p)
 		pathProvided = true
 	}
 	if h.configName != "" && h.configType != "" && pathProvided {
-		err := viper.ReadInConfig() // Find and read the config file
-		if err != nil {             // Handle errors reading the config file
-			log.Printf("Hatch: config file: %s\n", err)
+		err := v.ReadInConfig() // Find and read the config file
+		if err != nil {         // Handle errors reading the config file
+			log.Printf("hatch: config file: %s\n", err)
 		}
 	}
 
-	processStruct(i.GetType(), "")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
+	processStruct(v, i.GetType(), "")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 
-	err := viper.Unmarshal(i)
+	err := v.Unmarshal(i)
 	if err != nil {
-		log.Fatalf("Hatch: unable to decode into struct, %v\n", err)
+		log.Fatalf("hatch: unable to decode into struct, %v\n", err)
 	}
 }
 
-func processStruct(t reflect.Type, prefix string) {
+func processStruct(v *viper.Viper, t reflect.Type, prefix string) {
 	if t.Kind() != reflect.Struct {
-		log.Fatalf("Hatch: calling processStruct on: %s, %s which is not Kind of Struct", t.Name(), t.Kind())
+		log.Fatalf("hatch: calling processStruct on: %s, %s which is not Kind of Struct\n", t.Name(), t.Kind())
 	}
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
+		r, d := parseTag(sf)
 
 		k := sf.Tag.Get("mapstructure")
 		if k == "" {
@@ -92,17 +94,33 @@ func processStruct(t reflect.Type, prefix string) {
 		}
 		k = prefix + k
 		if sf.Type.Kind() == reflect.Struct {
-			processStruct(sf.Type, k+".")
+			processStruct(v, sf.Type, k+".")
 		} else {
-			d := sf.Tag.Get("default")
 			if d != "" {
-				viper.SetDefault(k, d)
+				v.SetDefault(k, d)
 			}
-			viper.BindEnv(k)
+			v.BindEnv(k)
 		}
-		r, _ := strconv.ParseBool(sf.Tag.Get("required"))
-		if r && !viper.IsSet(k) {
-			log.Fatalf("Hatch: key: %s is not set\n", k)
+		if r && !v.IsSet(k) {
+			log.Fatalf("hatch: required key: %s is not set\n", k)
 		}
 	}
+}
+
+func parseTag(sf reflect.StructField) (bool, string) {
+	h := sf.Tag.Get("hatch")
+	kv := strings.SplitN(h, ",", 2)
+	t1, t2 := func() (string, string) {
+		switch len(kv) {
+		case 2:
+			return kv[0], kv[1]
+		case 1:
+			return kv[0], ""
+		default:
+			return "", ""
+
+		}
+	}()
+	r, _ := strconv.ParseBool(t1)
+	return r, t2
 }
